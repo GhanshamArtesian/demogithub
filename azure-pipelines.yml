@@ -75,5 +75,5 @@ stages:
  azureSubscription: $(azureSubscription)
  appType: webAppLinux
  appName: $(webAppName)
- runtimeStack: ‘PHP|7.2’
+ runtimeStack: ‘PHP|7.4’
  package: $(Pipeline.Workspace)/drop/$(Build.BuildId).zip
