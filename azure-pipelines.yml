@@ -1,26 +1,79 @@
 # PHP
 # Test and package your PHP project.
 # Add steps that run tests, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/php
-
+ 
 trigger:
 - main
-
-pool:
-  vmImage: ubuntu-latest
-
+ 
 variables:
-  phpVersion: 7.4
-
-steps:
-- script: |
-    sudo update-alternatives --set php /usr/bin/php$(phpVersion)
-    sudo update-alternatives --set phar /usr/bin/phar$(phpVersion)
-    sudo update-alternatives --set phpdbg /usr/bin/phpdbg$(phpVersion)
-    sudo update-alternatives --set php-cgi /usr/bin/php-cgi$(phpVersion)
-    sudo update-alternatives --set phar.phar /usr/bin/phar.phar$(phpVersion)
-    php -version
-  displayName: 'Use PHP version $(phpVersion)'
-
-- script: composer install --no-interaction --prefer-dist
-  displayName: 'composer install'
+ 
+ # Azure Resource Manager connection created during pipeline creation
+ azureSubscription: ‘YourSubscription’
+ 
+ # Web app name
+ webAppName: ‘phptestapp’
+ 
+ # Resource group
+ resourceGroupName: ‘YourResourceGroupName’
+ 
+ # Environment name
+ environmentName: ‘phptestapp’
+ 
+ # Agent VM image name
+ vmImageName: ‘ubuntu-latest’
+ 
+stages:
+- stage: Archive
+ displayName: Archive stage
+ jobs: 
+ — job: Archive
+ displayName: Archive
+ pool:
+ vmImage: $(vmImageName)
+ steps: 
+ — task: AzureAppServiceSettings@1
+ inputs:
+ azureSubscription: $(azureSubscription)
+ appName: $(webAppName)
+ resourceGroupName: $(resourceGroupName)
+ appSettings: |
+ [
+ {
+ “name”: “SCM_DO_BUILD_DURING_DEPLOYMENT”,
+ “value”: “true”
+ }
+ ]
+ — task: ArchiveFiles@2
+ displayName: ‘Archive files’
+ inputs:
+ rootFolderOrFile: ‘$(System.DefaultWorkingDirectory)’
+ includeRootFolder: false
+ archiveType: zip
+ archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+ replaceExistingArchive: true
+ 
+ — upload: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+ artifact: drop
+ 
+- stage: Deploy
+ displayName: Deploy stage
+ dependsOn: Archive
+ condition: succeeded()
+ jobs:
+ — deployment: Deploy
+ displayName: Deploy
+ environment: $(environmentName)
+ pool: 
+ vmImage: $(vmImageName)
+ strategy:
+ runOnce:
+ deploy:
+ steps: 
+ — task: AzureWebApp@1
+ displayName: ‘Azure Web App Deploy: PHP Web App Deploy’
+ inputs:
+ azureSubscription: $(azureSubscription)
+ appType: webAppLinux
+ appName: $(webAppName)
+ runtimeStack: ‘PHP|7.2’
+ package: $(Pipeline.Workspace)/drop/$(Build.BuildId).zip
